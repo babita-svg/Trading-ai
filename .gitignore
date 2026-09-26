@@ -1,0 +1,9 @@
+.env
+*.jks
+*.keystore
+/build
+/app/build
+/risk-engine/build
+.gradle
+local.properties
+.superpowers/
