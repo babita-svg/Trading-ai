@@ -2,6 +2,10 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions.jvmTarget = "17"
+}
+
 dependencies {
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotest.assertions)
