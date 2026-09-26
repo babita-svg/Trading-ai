@@ -1,7 +1,7 @@
 package com.tradinghud.app.gemini
 
-import android.util.Base64
 import kotlinx.serialization.json.Json
+import java.util.Base64
 
 class GeminiRepository(private val api: GeminiApi = GeminiClient.api) {
 
@@ -21,7 +21,7 @@ class GeminiRepository(private val api: GeminiApi = GeminiClient.api) {
         capitalInr: String,
         marketType: String,
     ): Result<TradeSignal> = runCatching {
-        val base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+        val base64Image = Base64.getEncoder().encodeToString(imageBytes)
 
         val prompt = buildPrompt(capitalInr, marketType)
 
