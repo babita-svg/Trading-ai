@@ -31,6 +31,10 @@ class DailyLossPurityTest {
 
         // Proves that BigDecimal maintains exact decimal scale and zero drift
         assertEquals("1.50", exactSum.toPlainString())
+
+        // Explicitly prove that binary floating-point (Double/Float) diverges from base-10 calculation
+        assertNotEquals(exactSum, BigDecimal.valueOf(doubleSum))
+        assertNotEquals(exactSum.toDouble(), doubleSum)
     }
 
     @Test

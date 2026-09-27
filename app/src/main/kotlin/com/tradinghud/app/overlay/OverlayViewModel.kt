@@ -105,9 +105,9 @@ class OverlayViewModel(
 
             val proposal = TradeProposal(
                 signal = signal,
-                entry = BigDecimal(tradeSignal.entry_price.toString()),
-                stopLoss = BigDecimal(tradeSignal.stop_loss.toString()),
-                takeProfit = BigDecimal(tradeSignal.take_profit.toString()),
+                entry = BigDecimal(tradeSignal.entry_price),
+                stopLoss = BigDecimal(tradeSignal.stop_loss),
+                takeProfit = BigDecimal(tradeSignal.take_profit),
             )
 
             when (val verdict = RiskManager.assess(proposal, inputs)) {

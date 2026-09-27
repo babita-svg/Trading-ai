@@ -73,9 +73,9 @@ object RiskManager {
         val maxRisk = inputs.capitalInr.multiply(MAX_RISK_FRACTION)
         val rawQty = maxRisk.divide(riskPerUnit, MathContext.DECIMAL128)
         val quantity = try {
-            rawQty.setScale(0, RoundingMode.FLOOR).toLong()
+            rawQty.setScale(0, RoundingMode.FLOOR).longValueExact()
         } catch (e: Exception) {
-            Long.MAX_VALUE
+            return RiskVerdict.Rejected(RejectReason.CALCULATION_ERROR)
         }
         if (quantity < 1L) {
             return RiskVerdict.Rejected(RejectReason.POSITION_TOO_SMALL)
@@ -105,6 +105,3 @@ object RiskManager {
         )
     }
 }
-
-private operator fun BigDecimal.compareTo(other: BigDecimal): Int = this.compareTo(other)
-private operator fun BigDecimal.minus(other: BigDecimal): BigDecimal = this.subtract(other)

@@ -29,7 +29,7 @@ object GeminiClient {
     }
 
     val apiKey: String get() = BuildConfig.GEMINI_API_KEY
-    val MODEL: String get() = runCatching { BuildConfig.GEMINI_MODEL }.getOrElse { "gemini-2.5-flash" }
+    val MODEL: String get() = BuildConfig.GEMINI_MODEL
 
     val responseSchema = ResponseSchema(
         properties = mapOf(

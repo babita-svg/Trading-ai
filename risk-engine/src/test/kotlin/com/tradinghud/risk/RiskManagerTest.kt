@@ -182,4 +182,12 @@ class RiskManagerTest {
         val verdict = RiskManager.assess(proposal, RiskInputs(hugeCapital, BigDecimal.ZERO))
         verdict.shouldBeInstanceOf<RiskVerdict.Approved>()
     }
+
+    @Test fun `quantity overflow returns CALCULATION_ERROR`() {
+        // Extremely massive capital with a tiny fractional stop distance exceeding Long.MAX_VALUE
+        val absurdCapital = BigDecimal("999999999999999999999999999999999")
+        val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("99.99999999"), BigDecimal("110"))
+        val verdict = RiskManager.assess(proposal, RiskInputs(absurdCapital, BigDecimal.ZERO))
+        verdict shouldBe RiskVerdict.Rejected(RejectReason.CALCULATION_ERROR)
+    }
 }
