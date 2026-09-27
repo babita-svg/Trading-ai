@@ -11,5 +11,6 @@ object RejectReasonText {
         RejectReason.DAILY_LOSS_LIMIT -> "Daily loss limit reached (3% of capital). No more trades today."
         RejectReason.POSITION_TOO_SMALL -> "Position size is too small to trade. Increase capital or widen the stop."
         RejectReason.REWARD_TOO_SMALL -> "Take profit does not meet the minimum 1.5:1 reward-to-risk ratio."
+        RejectReason.IMPLAUSIBLE_PRICE_DISTANCE -> "Stop loss or take profit distance exceeds 50% of entry price (implausible price levels)."
     }
 }

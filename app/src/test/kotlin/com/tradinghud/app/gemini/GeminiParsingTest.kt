@@ -15,9 +15,9 @@ class GeminiParsingTest {
             {
               "signal": "BUY",
               "market_type": "INDIAN_EQUITY",
-              "entry_price": 2450.50,
-              "stop_loss": 2400.00,
-              "take_profit": 2550.00,
+              "entry_price": "2450.50",
+              "stop_loss": "2400.00",
+              "take_profit": "2550.00",
               "rationale": "Strong breakout above resistance"
             }
         """.trimIndent()
@@ -25,9 +25,9 @@ class GeminiParsingTest {
         val signal = json.decodeFromString<TradeSignal>(rawJson)
         assertEquals("BUY", signal.signal)
         assertEquals("INDIAN_EQUITY", signal.market_type)
-        assertEquals(2450.50, signal.entry_price)
-        assertEquals(2400.00, signal.stop_loss)
-        assertEquals(2550.00, signal.take_profit)
+        assertEquals("2450.50", signal.entry_price)
+        assertEquals("2400.00", signal.stop_loss)
+        assertEquals("2550.00", signal.take_profit)
         assertEquals("Strong breakout above resistance", signal.rationale)
     }
 
@@ -37,9 +37,9 @@ class GeminiParsingTest {
             {
               "signal": "WAIT",
               "market_type": "INDIAN_FNO",
-              "entry_price": 0.0,
-              "stop_loss": 0.0,
-              "take_profit": 0.0,
+              "entry_price": "0.0",
+              "stop_loss": "0.0",
+              "take_profit": "0.0",
               "rationale": "High volatility, wait for consolidation"
             }
         """.trimIndent()
@@ -47,7 +47,7 @@ class GeminiParsingTest {
         val signal = json.decodeFromString<TradeSignal>(rawJson)
         assertEquals("WAIT", signal.signal)
         assertEquals("INDIAN_FNO", signal.market_type)
-        assertEquals(0.0, signal.entry_price)
+        assertEquals("0.0", signal.entry_price)
     }
 
     @Test
@@ -55,7 +55,7 @@ class GeminiParsingTest {
         val rawJson = """
             {
               "signal": "BUY",
-              "entry_price": 100.0
+              "entry_price": "100.0"
             }
         """.trimIndent()
 

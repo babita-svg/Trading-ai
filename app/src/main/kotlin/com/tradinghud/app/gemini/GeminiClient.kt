@@ -29,15 +29,15 @@ object GeminiClient {
     }
 
     val apiKey: String get() = BuildConfig.GEMINI_API_KEY
-    const val MODEL = "gemini-3.8-flash"
+    val MODEL: String get() = runCatching { BuildConfig.GEMINI_MODEL }.getOrElse { "gemini-2.5-flash" }
 
     val responseSchema = ResponseSchema(
         properties = mapOf(
             "signal"       to SchemaProperty("STRING", "BUY, SELL, or WAIT"),
             "market_type"  to SchemaProperty("STRING", "INDIAN_EQUITY, INDIAN_FNO, or CRYPTO"),
-            "entry_price"  to SchemaProperty("NUMBER", "Suggested entry price"),
-            "stop_loss"    to SchemaProperty("NUMBER", "Structural stop loss price"),
-            "take_profit"  to SchemaProperty("NUMBER", "Logical take profit price"),
+            "entry_price"  to SchemaProperty("STRING", "Suggested entry price as decimal string"),
+            "stop_loss"    to SchemaProperty("STRING", "Structural stop loss price as decimal string"),
+            "take_profit"  to SchemaProperty("STRING", "Logical take profit price as decimal string"),
             "rationale"    to SchemaProperty("STRING", "Brief reason for the signal"),
         ),
         required = listOf("signal", "market_type", "entry_price", "stop_loss", "take_profit", "rationale"),

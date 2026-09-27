@@ -7,7 +7,8 @@ import retrofit2.http.Query
 
 interface GeminiApi {
     /**
-     * Targets the Interactions API for stateless multimodal requests.
+     * Targets the Google Gemini REST API generateContent endpoint (v1beta/models/{model}:generateContent)
+     * for stateless multimodal requests (chart analysis + text prompt).
      * The model is appended via [model]; the API key via [key].
      */
     @POST("v1beta/models/{model}:generateContent")

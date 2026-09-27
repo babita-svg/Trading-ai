@@ -1,6 +1,7 @@
 package com.tradinghud.risk
 
 import com.tradinghud.risk.RiskConstants.MAX_DAILY_LOSS_FRACTION
+import com.tradinghud.risk.RiskConstants.MAX_PLAUSIBLE_PRICE_DISTANCE_FRACTION
 import com.tradinghud.risk.RiskConstants.MAX_RISK_FRACTION
 import com.tradinghud.risk.RiskConstants.MIN_REWARD_TO_RISK
 import java.math.BigDecimal
@@ -21,7 +22,7 @@ object RiskManager {
     }
 
     /**
-     * Full seven-step evaluation. Returns [RiskVerdict.Approved] only when
+     * Full eight-step evaluation. Returns [RiskVerdict.Approved] only when
      * every constraint passes. First failure wins.
      */
     fun assess(proposal: TradeProposal, inputs: RiskInputs): RiskVerdict {
@@ -56,21 +57,31 @@ object RiskManager {
             return RiskVerdict.Rejected(RejectReason.STOP_ON_WRONG_SIDE)
         }
 
-        // 5. Daily cap
+        // 5. Plausible price distance sanity check (guards against hallucinations)
+        val stopDistance = (entry - stop).abs()
+        val targetDistance = (entry - target).abs()
+        val maxAllowedDistance = entry.multiply(MAX_PLAUSIBLE_PRICE_DISTANCE_FRACTION)
+        if (stopDistance > maxAllowedDistance || targetDistance > maxAllowedDistance) {
+            return RiskVerdict.Rejected(RejectReason.IMPLAUSIBLE_PRICE_DISTANCE)
+        }
+
+        // 6. Daily cap
         checkDailyLoss(inputs)?.let { return it }
 
-        // 6. Quantity
-        val riskPerUnit = (entry - stop).abs()
+        // 7. Quantity
+        val riskPerUnit = stopDistance
         val maxRisk = inputs.capitalInr.multiply(MAX_RISK_FRACTION)
         val rawQty = maxRisk.divide(riskPerUnit, MathContext.DECIMAL128)
-        val quantity = rawQty.setScale(0, RoundingMode.FLOOR).toLong()
+        val quantity = try {
+            rawQty.setScale(0, RoundingMode.FLOOR).toLong()
+        } catch (e: Exception) {
+            Long.MAX_VALUE
+        }
         if (quantity < 1L) {
             return RiskVerdict.Rejected(RejectReason.POSITION_TOO_SMALL)
         }
 
-        // 7. Reward
-        val stopDistance = riskPerUnit
-        val targetDistance = (entry - target).abs()
+        // 8. Reward
         val profitable = when (proposal.signal) {
             Signal.BUY -> target > entry
             Signal.SELL -> target < entry

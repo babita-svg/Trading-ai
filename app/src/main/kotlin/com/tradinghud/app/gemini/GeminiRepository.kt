@@ -1,6 +1,8 @@
 package com.tradinghud.app.gemini
 
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
+import java.math.BigDecimal
 import java.util.Base64
 
 class GeminiRepository(private val api: GeminiApi = GeminiClient.api) {
@@ -8,13 +10,9 @@ class GeminiRepository(private val api: GeminiApi = GeminiClient.api) {
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
-     * Sends the chart image and trading context to Gemini.
+     * Sends the chart image and trading context to Gemini with bounded retry-with-backoff.
      * Returns [Result.success] with a parsed [TradeSignal], or
      * [Result.failure] with a descriptive exception on any error.
-     *
-     * @param imageBytes  JPEG bytes from ImageProcessor (already scaled + compressed)
-     * @param capitalInr  Capital string the user typed (for the prompt)
-     * @param marketType  One of "INDIAN_EQUITY", "INDIAN_FNO", "CRYPTO"
      */
     suspend fun analyze(
         imageBytes: ByteArray,
@@ -22,7 +20,6 @@ class GeminiRepository(private val api: GeminiApi = GeminiClient.api) {
         marketType: String,
     ): Result<TradeSignal> = runCatching {
         val base64Image = Base64.getEncoder().encodeToString(imageBytes)
-
         val prompt = buildPrompt(capitalInr, marketType)
 
         val request = GeminiRequest(
@@ -40,19 +37,38 @@ class GeminiRepository(private val api: GeminiApi = GeminiClient.api) {
             ),
         )
 
-        val response = api.interact(
-            model = GeminiClient.MODEL,
-            key = GeminiClient.apiKey,
-            request = request,
-        )
+        val maxAttempts = 3
+        var attempt = 0
+        var response: retrofit2.Response<GeminiResponse>? = null
+        var lastException: Exception? = null
 
-        if (!response.isSuccessful) {
+        while (attempt < maxAttempts) {
+            try {
+                response = api.interact(
+                    model = GeminiClient.MODEL,
+                    key = GeminiClient.apiKey,
+                    request = request,
+                )
+                break
+            } catch (e: Exception) {
+                lastException = e
+                attempt++
+                if (attempt >= maxAttempts) {
+                    throw e
+                }
+                delay(100L * attempt)
+            }
+        }
+
+        val resp = response ?: throw (lastException ?: GeminiApiException("Network request failed after retries"))
+
+        if (!resp.isSuccessful) {
             throw GeminiApiException(
-                "HTTP ${response.code()}: ${response.errorBody()?.string() ?: "unknown error"}"
+                "HTTP ${resp.code()}: ${resp.errorBody()?.string() ?: "unknown error"}"
             )
         }
 
-        val body = response.body()
+        val body = resp.body()
             ?: throw GeminiApiException("Empty response body")
 
         if (body.error != null) {
@@ -67,7 +83,17 @@ class GeminiRepository(private val api: GeminiApi = GeminiClient.api) {
             ?.text
             ?: throw GeminiParseException("No text content in response")
 
-        json.decodeFromString<TradeSignal>(rawJson)
+        val tradeSignal = json.decodeFromString<TradeSignal>(rawJson)
+
+        try {
+            BigDecimal(tradeSignal.entry_price)
+            BigDecimal(tradeSignal.stop_loss)
+            BigDecimal(tradeSignal.take_profit)
+        } catch (e: Exception) {
+            throw GeminiParseException("Invalid price format returned by model: ${e.message}")
+        }
+
+        tradeSignal
     }
 
     private fun buildPrompt(capitalInr: String, marketType: String): String = """
@@ -80,13 +106,13 @@ class GeminiRepository(private val api: GeminiApi = GeminiClient.api) {
         Return a JSON trade signal with:
         - signal: "BUY", "SELL", or "WAIT" (WAIT if the chart is unclear or no trade is valid)
         - market_type: must be exactly "$marketType"
-        - entry_price: the suggested entry price (0.0 if WAIT)
-        - stop_loss: the structural stop loss price (0.0 if WAIT)
-        - take_profit: the logical take profit price (0.0 if WAIT)
+        - entry_price: the suggested entry price as a decimal string with no scientific notation and no thousands separators ("0" if WAIT)
+        - stop_loss: the structural stop loss price as a decimal string with no scientific notation and no thousands separators ("0" if WAIT)
+        - take_profit: the logical take profit price as a decimal string with no scientific notation and no thousands separators ("0" if WAIT)
         - rationale: a brief (1–2 sentence) reason for the signal
 
         Rules:
-        1. If signal is WAIT, set all prices to 0.0.
+        1. If signal is WAIT, set all prices to "0".
         2. For BUY, stop_loss must be below entry_price.
         3. For SELL, stop_loss must be above entry_price.
         4. Do not suggest a trade if the chart structure is ambiguous.

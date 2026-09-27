@@ -5,15 +5,15 @@ import kotlinx.serialization.Serializable
 
 /**
  * The exact JSON shape Gemini must return, enforced via responseSchema.
- * Every field is non-null. A missing field is a parse error, never a default.
+ * Prices are stored as Strings to eliminate any Double binary floating-point round-trip loss.
  */
 @Serializable
 data class TradeSignal(
     val signal: String,           // "BUY" | "SELL" | "WAIT"
     val market_type: String,      // "INDIAN_EQUITY" | "INDIAN_FNO" | "CRYPTO"
-    val entry_price: Double,
-    val stop_loss: Double,
-    val take_profit: Double,
+    val entry_price: String,
+    val stop_loss: String,
+    val take_profit: String,
     val rationale: String,
 )
 

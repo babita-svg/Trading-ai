@@ -10,18 +10,20 @@ interface TradeLogDao {
     @Insert
     suspend fun insert(entity: TradeLogEntity)
 
-    /**
-     * Returns the sum of all loss amounts on or after [startOfDayMillis].
-     * Returns "0" if there are no losses today.
-     */
     @Query(
-        "SELECT COALESCE(SUM(CAST(amountInr AS REAL)), 0) " +
-        "FROM closed_trades " +
+        "SELECT amountInr FROM closed_trades " +
         "WHERE isWin = 0 AND timestampMillis >= :startOfDayMillis"
     )
-    suspend fun sumLossesToday(startOfDayMillis: Long): Double
+    suspend fun getLossAmountsToday(startOfDayMillis: Long): List<String>
 
-    /** Convenience: convert the raw Double sum to BigDecimal for the risk engine. */
-    suspend fun sumLossesTodayBd(startOfDayMillis: Long): BigDecimal =
-        BigDecimal(sumLossesToday(startOfDayMillis).toString())
+    /**
+     * Computes the exact sum of all loss amounts on or after [startOfDayMillis]
+     * purely in Kotlin using BigDecimal to avoid any floating-point round-trip loss.
+     */
+    suspend fun sumLossesTodayBd(startOfDayMillis: Long): BigDecimal {
+        val amounts = getLossAmountsToday(startOfDayMillis)
+        return amounts.fold(BigDecimal.ZERO) { acc, amt ->
+            acc.add(BigDecimal(amt))
+        }
+    }
 }

@@ -20,6 +20,11 @@ android {
             "GEMINI_API_KEY",
             "\"${rootProject.ext["geminiApiKey"]}\""
         )
+        buildConfigField(
+            "String",
+            "GEMINI_MODEL",
+            "\"gemini-2.5-flash\""
+        )
     }
     buildFeatures {
         buildConfig = true

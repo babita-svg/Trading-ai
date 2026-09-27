@@ -64,10 +64,32 @@ class RiskManagerTest {
             RiskVerdict.Rejected(RejectReason.STOP_ON_WRONG_SIDE)
     }
 
+    // ── Plausible Price Distance (Anti-Hallucination) ─────────────────────────
+
+    @Test fun `stop distance greater than 50 percent of entry returns IMPLAUSIBLE_PRICE_DISTANCE`() {
+        // Entry 100, Stop 40 -> distance 60 > 50 (50% of 100)
+        val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("40"), BigDecimal("190"))
+        RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO)) shouldBe
+            RiskVerdict.Rejected(RejectReason.IMPLAUSIBLE_PRICE_DISTANCE)
+    }
+
+    @Test fun `target distance greater than 50 percent of entry returns IMPLAUSIBLE_PRICE_DISTANCE`() {
+        // Entry 100, Stop 95, Target 160 -> target distance 60 > 50 (50% of 100)
+        val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("95"), BigDecimal("160"))
+        RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO)) shouldBe
+            RiskVerdict.Rejected(RejectReason.IMPLAUSIBLE_PRICE_DISTANCE)
+    }
+
+    @Test fun `stop and target distance within 50 percent of entry are accepted`() {
+        // Entry 100, Stop 90 (dist 10), Target 116 (dist 16) -> both <= 50
+        val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("90"), BigDecimal("116"))
+        RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO))
+            .shouldBeInstanceOf<RiskVerdict.Approved>()
+    }
+
     // ── Daily cap ────────────────────────────────────────────────────────────
 
     @Test fun `loss exactly at 3 percent blocks DAILY_LOSS_LIMIT`() {
-        // ₹3,000 = exactly 3% of ₹1,00,000 — must block (≥ not >)
         val inputs = RiskInputs(capital, BigDecimal("3000"))
         val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("95"), BigDecimal("108"))
         RiskManager.assess(proposal, inputs) shouldBe
@@ -94,8 +116,6 @@ class RiskManagerTest {
     // ── Position sizing ──────────────────────────────────────────────────────
 
     @Test fun `quantity rounds down correctly`() {
-        // capital=₹1,00,000, risk=1.5%=₹1,500, stop distance=₹5
-        // raw qty = 1500/5 = 300.0 → 300
         val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("95"), BigDecimal("108"))
         val verdict = RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO))
         verdict shouldBe RiskVerdict.Approved(
@@ -106,8 +126,6 @@ class RiskManagerTest {
     }
 
     @Test fun `quantity that rounds to exactly 1 is approved`() {
-        // capital=₹100, risk=1.5%=₹1.50, stop distance=₹1
-        // raw qty = 1.5 → floor = 1
         val proposal = TradeProposal(Signal.BUY, BigDecimal("10"), BigDecimal("9"), BigDecimal("12"))
         val verdict = RiskManager.assess(proposal, RiskInputs(BigDecimal("100"), BigDecimal.ZERO))
         verdict.shouldBeInstanceOf<RiskVerdict.Approved>()
@@ -115,41 +133,53 @@ class RiskManagerTest {
     }
 
     @Test fun `quantity that rounds to zero returns POSITION_TOO_SMALL`() {
-        // capital=₹50, risk=1.5%=₹0.75, stop distance=₹5
-        // raw qty = 0.15 → floor = 0 → POSITION_TOO_SMALL
         val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("95"), BigDecimal("108"))
         RiskManager.assess(proposal, RiskInputs(BigDecimal("50"), BigDecimal.ZERO)) shouldBe
             RiskVerdict.Rejected(RejectReason.POSITION_TOO_SMALL)
     }
 
+    // ── High precision crypto price decimals ─────────────────────────────────
+
+    @Test fun `high decimal precision crypto prices calculated exactly`() {
+        // Bitcoin satoshi or low-value altcoin with 8 decimal places
+        val entry = BigDecimal("0.00012345")
+        val stop = BigDecimal("0.00011000") // diff 0.00001345
+        val target = BigDecimal("0.00015000") // diff 0.00002655 (R:R > 1.97)
+        val proposal = TradeProposal(Signal.BUY, entry, stop, target)
+        val verdict = RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO))
+        verdict.shouldBeInstanceOf<RiskVerdict.Approved>()
+    }
+
     // ── Reward ───────────────────────────────────────────────────────────────
 
     @Test fun `reward exactly at 1_5x passes`() {
-        // stop distance = 5, target distance = 7.5 → ratio = 1.5 exactly
         val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("95"), BigDecimal("107.5"))
         RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO))
             .shouldBeInstanceOf<RiskVerdict.Approved>()
     }
 
     @Test fun `reward below 1_5x returns REWARD_TOO_SMALL`() {
-        // stop distance = 5, target distance = 7 → ratio = 1.4
         val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("95"), BigDecimal("107"))
         RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO)) shouldBe
             RiskVerdict.Rejected(RejectReason.REWARD_TOO_SMALL)
     }
 
     @Test fun `SELL take profit must be below entry`() {
-        // SELL: entry=100, stop=105 (above), target=90 (below = profit direction)
-        // stop side is wrong; first check that fails wins
-        val proposal = TradeProposal(Signal.SELL, BigDecimal("100"), BigDecimal("105"), BigDecimal("110")) // TP above (wrong direction)
+        val proposal = TradeProposal(Signal.SELL, BigDecimal("100"), BigDecimal("105"), BigDecimal("110"))
         RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO)) shouldBe
             RiskVerdict.Rejected(RejectReason.REWARD_TOO_SMALL)
     }
 
     @Test fun `SELL with valid stop and valid target is approved`() {
-        // SELL stop must be ABOVE entry: entry=100, stop=106, target=91 (distance stop=6, distance tp=9 → 1.5x ✓)
         val proposal = TradeProposal(Signal.SELL, BigDecimal("100"), BigDecimal("106"), BigDecimal("91"))
         RiskManager.assess(proposal, RiskInputs(capital, BigDecimal.ZERO))
             .shouldBeInstanceOf<RiskVerdict.Approved>()
+    }
+
+    @Test fun `overflow-safe for extremely large capital`() {
+        val hugeCapital = BigDecimal("999999999999999999")
+        val proposal = TradeProposal(Signal.BUY, BigDecimal("100"), BigDecimal("95"), BigDecimal("110"))
+        val verdict = RiskManager.assess(proposal, RiskInputs(hugeCapital, BigDecimal.ZERO))
+        verdict.shouldBeInstanceOf<RiskVerdict.Approved>()
     }
 }

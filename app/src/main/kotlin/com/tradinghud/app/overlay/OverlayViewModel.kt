@@ -143,7 +143,7 @@ class OverlayViewModel(
     }
 }
 
-fun todayStartMillis(): Long {
+internal fun todayStartMillis(): Long {
     val zone = ZoneId.systemDefault()
     return LocalDate.now(zone).atStartOfDay(zone).toInstant().toEpochMilli()
 }
